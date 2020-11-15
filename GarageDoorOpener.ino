@@ -20,9 +20,9 @@
 // GPIO assignments
 //
 
-#define PIN_OPERATOR_CONTROL 14 // NodeMCU pin D5
-#define PIN_SENSOR_CLOSED     5 // NodeMCU pin D1
-#define PIN_SENSOR_OPENED     4 // NodeMCU pin D2
+#define PIN_OPERATOR_CONTROL 5 // Wemos D1 Relay -- NodeMCU pin D5
+#define PIN_SENSOR_CLOSED     0 // Wemos D3 -- NodeMCU pin D1
+#define PIN_SENSOR_OPENED     4 // Wemos D2 -- NodeMCU pin D2
 
 
 //
