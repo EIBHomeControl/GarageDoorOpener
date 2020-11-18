@@ -66,6 +66,7 @@ extern "C" homekit_characteristic_t cha_lock_target_state;
 
 // For reporting heap usage on the serial output every 5 seconds
 static uint32_t next_heap_millis = 0;
+static uint32_t next_led_millis = 0;
 
 
 //
@@ -184,6 +185,15 @@ void my_homekit_loop() {
 		next_heap_millis = t + 5 * 1000;
 		LOG_D("Free heap: %d, HomeKit clients: %d", ESP.getFreeHeap(), arduino_homekit_connected_clients_count());
 	}
+  
+  if (t > next_led_millis) {
+    // show heap info every 5 seconds
+   digitalWrite(LED_BUILTIN, LOW);  // Change the state of the LED
+   delay(5);
+   digitalWrite(LED_BUILTIN, HIGH);  // Change the state of the LED
+    next_led_millis = t + 1000;
+  }
+
 
 }
 
@@ -194,16 +204,14 @@ void setup() {
   pinMode(PIN_SENSOR_CLOSED, INPUT_PULLUP);
   pinMode(PIN_SENSOR_OPENED, INPUT_PULLUP);
 
+  pinMode(LED_BUILTIN, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
+
   // Set the control pin to output
   pinMode(PIN_OPERATOR_CONTROL, OUTPUT);
 
-  // Set interrupts to watch for changes in the open/close sensors
-  attachInterrupt(digitalPinToInterrupt(PIN_SENSOR_CLOSED), handle_sensor_change, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(PIN_SENSOR_OPENED), handle_sensor_change, CHANGE);
-
   Serial.begin(115200);
   wifi_connect(); // in wifi_info.h
-  //homekit_storage_reset(); // to remove the previous HomeKit pairing storage when you first run this new HomeKit example
+  //homekit_storage_reset(); // to remove the previous HomeKit pairing storage when you first run this new HomeKit example  
   my_homekit_setup();
 
   // Initialize the current door state
@@ -229,6 +237,10 @@ void setup() {
       break;
   }  
   homekit_characteristic_notify(&cha_target_door_state, cha_target_door_state.value);
+
+// Set interrupts to watch for changes in the open/close sensors
+  attachInterrupt(digitalPinToInterrupt(PIN_SENSOR_CLOSED), handle_sensor_change, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PIN_SENSOR_OPENED), handle_sensor_change, CHANGE);
 
 }
 
