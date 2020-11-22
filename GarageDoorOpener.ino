@@ -1,13 +1,13 @@
 /*
- * GarageDoorOpener.ino
- *
- *  Created on: 2020-06-27
- *      Author: jmbwell (John Burwell)
- *
- * HAP section 8.16 garage door opener
- * An accessory that contains a garage door opener that opens and closes
- *
- */
+   GarageDoorOpener.ino
+
+    Created on: 2020-06-27
+        Author: jmbwell (John Burwell)
+
+   HAP section 8.16 garage door opener
+   An accessory that contains a garage door opener that opens and closes
+
+*/
 
 #include <Arduino.h>
 #include <arduino_homekit_server.h>
@@ -21,8 +21,8 @@
 //
 
 #define PIN_OPERATOR_CONTROL 5 // Wemos D1 Relay -- NodeMCU pin D5
-#define PIN_SENSOR_CLOSED     0 // Wemos D3 -- NodeMCU pin D1
-#define PIN_SENSOR_OPENED     4 // Wemos D2 -- NodeMCU pin D2
+#define PIN_SENSOR_CLOSED     4 // Wemos D2 -- NodeMCU pin D1
+#define PIN_SENSOR_OPENED     14 // Wemos D5 -- NodeMCU pin D2
 
 
 //
@@ -70,11 +70,11 @@ static uint32_t next_led_millis = 0;
 
 
 //
-// Interrupt handler 
-// 
+// Interrupt handler
+//
 
 // Interrupts cannot be stored in flash; tell the compiler to put it in RAM
-void ICACHE_RAM_ATTR handle_sensor_change(); 
+void ICACHE_RAM_ATTR handle_sensor_change();
 
 // When one of the pins changes, toggle a variable to TRUE so we can respond inside the main loop()
 bool sensor_interrupt = FALSE;
@@ -93,13 +93,30 @@ homekit_value_t cha_current_door_state_getter() {
   // Stash the current state so we can detect a change
   homekit_characteristic_t current_state = cha_current_door_state;
 
+  if  ( digitalRead(PIN_SENSOR_OPENED) == LOW ) {
+    LOG_D("Pin Open closed")
+  }
+  else {
+    LOG_D("Pin Open open");
+  }
+
+  if  ( digitalRead(PIN_SENSOR_CLOSED) == LOW ) {
+    LOG_D("Pin Close closed")
+  }
+  else {
+    LOG_D("Pin Close open");
+  }
+
+
   // Read the sensors and use some logic to determine state
   if ( digitalRead(PIN_SENSOR_OPENED) == LOW ) {
     // If PIN_SENSOR_OPENED is low, it's being pulled to ground, which means the switch at the top of the track is closed, which means the door is open
+    cha_target_door_state.value.uint8_value = HOMEKIT_CHARACTERISTIC_TARGET_DOOR_STATE_OPEN;
     cha_current_door_state.value.uint8_value = HOMEKIT_CHARACTERISTIC_CURRENT_DOOR_STATE_OPEN;
-  } 
+  }
   else if ( digitalRead(PIN_SENSOR_CLOSED) == LOW ) {
     // If PIN_SENSOR_CLOSED is low, it's being pulled to ground, which means the switch at the bottom of the track is closed, which means the door is closed
+    cha_target_door_state.value.uint8_value = HOMEKIT_CHARACTERISTIC_TARGET_DOOR_STATE_CLOSED;
     cha_current_door_state.value.uint8_value = HOMEKIT_CHARACTERISTIC_CURRENT_DOOR_STATE_CLOSED;
   } else {
     // If neither, then the door is in between switches, so we use the last known state to determine which way it's probably going
@@ -117,29 +134,30 @@ homekit_value_t cha_current_door_state_getter() {
     } else if ( cha_current_door_state.value.uint8_value = HOMEKIT_CHARACTERISTIC_CURRENT_DOOR_STATE_CLOSING ) {
       cha_target_door_state.value.uint8_value = HOMEKIT_CHARACTERISTIC_TARGET_DOOR_STATE_CLOSED;
     }
-    // ... and then notify HomeKit clients
-  	LOG_D("Target door state: %i", cha_target_door_state.value.uint8_value);
-    homekit_characteristic_notify(&cha_target_door_state, cha_target_door_state.value);
   }
 
-	LOG_D("Current door state: %i", cha_current_door_state.value.uint8_value);
-	return cha_current_door_state.value;
+  // ... and then notify HomeKit clients
+  LOG_D("Target door state: %i", cha_target_door_state.value.uint8_value);
+  homekit_characteristic_notify(&cha_target_door_state, cha_target_door_state.value);
+
+  LOG_D("Current door state: %i", cha_current_door_state.value.uint8_value);
+  return cha_current_door_state.value;
 }
 
 // Called when getting current obstruction state
 homekit_value_t cha_obstruction_detected_getter() {
-	LOG_D("Obstruction: %s", cha_obstruction_detected.value.bool_value ? "Detected" : "Not detected");
-	return cha_obstruction_detected.value;
+  LOG_D("Obstruction: %s", cha_obstruction_detected.value.bool_value ? "Detected" : "Not detected");
+  return cha_obstruction_detected.value;
 }
 
 // Called when getting current lock state
 homekit_value_t cha_lock_current_state_getter() {
-	LOG_D("Current lock state: %i", cha_lock_current_state.value.uint8_value);
-	return cha_lock_current_state.value;
+  LOG_D("Current lock state: %i", cha_lock_current_state.value.uint8_value);
+  return cha_lock_current_state.value;
 }
 
 
-// 
+//
 // Setters
 //
 
@@ -148,7 +166,7 @@ void cha_target_door_state_setter(const homekit_value_t value) {
 
   // State value requested by HomeKit
   cha_target_door_state.value = value;
-	LOG_D("Target door state: %i", value.uint8_value);
+  LOG_D("Target door state: %i", value.uint8_value);
 
   // If the current state is not equal to the target state, then we "push the button"; otherwise, we do nothing
   if (cha_current_door_state.value.uint8_value != cha_target_door_state.value.uint8_value) {
@@ -156,7 +174,7 @@ void cha_target_door_state_setter(const homekit_value_t value) {
     delay(500);
     digitalWrite(PIN_OPERATOR_CONTROL, LOW);
   }
-  
+
 }
 
 
@@ -166,37 +184,52 @@ void cha_target_door_state_setter(const homekit_value_t value) {
 
 void my_homekit_setup() {
 
-	// Set the setters and getters
-	cha_current_door_state.getter = cha_current_door_state_getter;
-	cha_target_door_state.setter = cha_target_door_state_setter;
-	cha_lock_current_state.getter = cha_lock_current_state_getter;
-	cha_obstruction_detected.getter = cha_obstruction_detected_getter;
+  // Set the setters and getters
+  cha_current_door_state.getter = cha_current_door_state_getter;
+  cha_target_door_state.setter = cha_target_door_state_setter;
+  cha_lock_current_state.getter = cha_lock_current_state_getter;
+  cha_obstruction_detected.getter = cha_obstruction_detected_getter;
 
-	arduino_homekit_setup(&config);
+  arduino_homekit_setup(&config);
 }
 
 void my_homekit_loop() {
 
-	arduino_homekit_loop();
+  arduino_homekit_loop();
 
-	const uint32_t t = millis();
-	if (t > next_heap_millis) {
-		// show heap info every 5 seconds
-		next_heap_millis = t + 5 * 1000;
-		LOG_D("Free heap: %d, HomeKit clients: %d", ESP.getFreeHeap(), arduino_homekit_connected_clients_count());
-	}
-  
+  const uint32_t t = millis();
+  if (t > next_heap_millis) {
+    // show heap info every 5 seconds
+    next_heap_millis = t + 5 * 1000;
+    LOG_D("Free heap: %d, HomeKit clients: %d", ESP.getFreeHeap(), arduino_homekit_connected_clients_count());
+  }
+
   if (t > next_led_millis) {
     // show heap info every 5 seconds
-   digitalWrite(LED_BUILTIN, LOW);  // Change the state of the LED
-   delay(5);
-   digitalWrite(LED_BUILTIN, HIGH);  // Change the state of the LED
+    digitalWrite(LED_BUILTIN, LOW);  // Change the state of the LED
+    delay(5);
+    digitalWrite(LED_BUILTIN, HIGH);  // Change the state of the LED
     next_led_millis = t + 1000;
+    //LOG_D("WiFi Signal: %d",WiFi.RSSI());
   }
 
 
 }
 
+void Chip_info() {
+  LOG_D("");
+  LOG_D("SketchSize: %d", ESP.getSketchSize());
+  LOG_D("FreeSketchSpace: %d", ESP.getFreeSketchSpace());
+  LOG_D("FlashChipSize: %d", ESP.getFlashChipSize());
+  LOG_D("FlashChipRealSize: %d", ESP.getFlashChipRealSize());
+  LOG_D("FlashChipSpeed: %d", ESP.getFlashChipSpeed());
+  LOG_D("SdkVersion: %s", ESP.getSdkVersion());
+  LOG_D("FullVersion: %s", ESP.getFullVersion().c_str());
+  LOG_D("CpuFreq: %dMHz", ESP.getCpuFreqMHz());
+  LOG_D("FreeHeap: %d", ESP.getFreeHeap());
+  LOG_D("ResetInfo: %s", ESP.getResetInfo().c_str());
+  LOG_D("ResetReason: %s", ESP.getResetReason().c_str());
+}
 
 void setup() {
 
@@ -211,8 +244,15 @@ void setup() {
 
   Serial.begin(115200);
   wifi_connect(); // in wifi_info.h
-  //homekit_storage_reset(); // to remove the previous HomeKit pairing storage when you first run this new HomeKit example  
+  Chip_info();
+  INFO_HEAP();
+  //homekit_storage_reset(); // to remove the previous HomeKit pairing storage when you first run this new HomeKit example
   my_homekit_setup();
+  INFO_HEAP();
+
+  // Set interrupts to watch for changes in the open/close sensors
+  attachInterrupt(digitalPinToInterrupt(PIN_SENSOR_CLOSED), handle_sensor_change, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PIN_SENSOR_OPENED), handle_sensor_change, CHANGE);
 
   // Initialize the current door state
   homekit_value_t current_state = cha_current_door_state_getter();
@@ -220,27 +260,24 @@ void setup() {
 
   // Initialize target door state based on the current door state
   switch (cha_current_door_state.value.uint8_value) {
-    case HOMEKIT_CHARACTERISTIC_CURRENT_DOOR_STATE_CLOSED: 
-      cha_target_door_state.value.uint8_value = HOMEKIT_CHARACTERISTIC_TARGET_DOOR_STATE_CLOSED; 
+    case HOMEKIT_CHARACTERISTIC_CURRENT_DOOR_STATE_CLOSED:
+      cha_target_door_state.value.uint8_value = HOMEKIT_CHARACTERISTIC_TARGET_DOOR_STATE_CLOSED;
       break;
-    case HOMEKIT_CHARACTERISTIC_CURRENT_DOOR_STATE_CLOSING: 
-      cha_target_door_state.value.uint8_value = HOMEKIT_CHARACTERISTIC_TARGET_DOOR_STATE_CLOSED; 
+    case HOMEKIT_CHARACTERISTIC_CURRENT_DOOR_STATE_CLOSING:
+      cha_target_door_state.value.uint8_value = HOMEKIT_CHARACTERISTIC_TARGET_DOOR_STATE_CLOSED;
       break;
-    case HOMEKIT_CHARACTERISTIC_CURRENT_DOOR_STATE_OPEN: 
-      cha_target_door_state.value.uint8_value = HOMEKIT_CHARACTERISTIC_TARGET_DOOR_STATE_OPEN; 
+    case HOMEKIT_CHARACTERISTIC_CURRENT_DOOR_STATE_OPEN:
+      cha_target_door_state.value.uint8_value = HOMEKIT_CHARACTERISTIC_TARGET_DOOR_STATE_OPEN;
       break;
-    case HOMEKIT_CHARACTERISTIC_CURRENT_DOOR_STATE_OPENING: 
-      cha_target_door_state.value.uint8_value = HOMEKIT_CHARACTERISTIC_TARGET_DOOR_STATE_OPEN; 
+    case HOMEKIT_CHARACTERISTIC_CURRENT_DOOR_STATE_OPENING:
+      cha_target_door_state.value.uint8_value = HOMEKIT_CHARACTERISTIC_TARGET_DOOR_STATE_OPEN;
       break;
-    default: 
-      cha_target_door_state.value.uint8_value = HOMEKIT_CHARACTERISTIC_TARGET_DOOR_STATE_UNKNOWN; 
+    default:
+      cha_target_door_state.value.uint8_value = HOMEKIT_CHARACTERISTIC_TARGET_DOOR_STATE_UNKNOWN;
       break;
-  }  
+  }
   homekit_characteristic_notify(&cha_target_door_state, cha_target_door_state.value);
 
-// Set interrupts to watch for changes in the open/close sensors
-  attachInterrupt(digitalPinToInterrupt(PIN_SENSOR_CLOSED), handle_sensor_change, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(PIN_SENSOR_OPENED), handle_sensor_change, CHANGE);
 
 }
 
@@ -252,7 +289,7 @@ void loop() {
     homekit_characteristic_notify(&cha_current_door_state, new_state);
     sensor_interrupt = FALSE;
   }
-  
+
 
   my_homekit_loop();
   delay(10);
