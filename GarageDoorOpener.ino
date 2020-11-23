@@ -12,6 +12,7 @@
 #include <Arduino.h>
 #include <arduino_homekit_server.h>
 #include "wifi_info.h"
+#include "wifi_ota.h"
 
 #define LOG_D(fmt, ...)   printf_P(PSTR(fmt "\n") , ##__VA_ARGS__);
 
@@ -244,6 +245,7 @@ void setup() {
 
   Serial.begin(115200);
   wifi_connect(); // in wifi_info.h
+  wifi_ota_setup();
   Chip_info();
   INFO_HEAP();
   //homekit_storage_reset(); // to remove the previous HomeKit pairing storage when you first run this new HomeKit example
@@ -289,7 +291,7 @@ void loop() {
     homekit_characteristic_notify(&cha_current_door_state, new_state);
     sensor_interrupt = FALSE;
   }
-
+  ArduinoOTA.handle();
 
   my_homekit_loop();
   delay(10);

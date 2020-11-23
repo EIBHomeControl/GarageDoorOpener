@@ -6,8 +6,11 @@
         Author: jmbwell (John Burwell)
 */
 
+
 #include <homekit/homekit.h>
 #include <homekit/characteristics.h>
+
+#include "config.h"
 
 void my_accessory_identify(homekit_value_t _value) {
   printf("accessory identify\n");
@@ -34,7 +37,7 @@ homekit_characteristic_t cha_target_door_state = HOMEKIT_CHARACTERISTIC_(TARGET_
 homekit_characteristic_t cha_obstruction_detected = HOMEKIT_CHARACTERISTIC_(OBSTRUCTION_DETECTED, 0);
 
 // format: string; HAP section 9.62; max length 64
-homekit_characteristic_t cha_name = HOMEKIT_CHARACTERISTIC_(NAME, "GarageDoorOpener-01");
+homekit_characteristic_t cha_name = HOMEKIT_CHARACTERISTIC_(NAME, homekit_name);
 
 // format: uint8; HAP section 9.30; 0 = unsecured, 1 = secured, 2 = jammed, 3 = unknown
 homekit_characteristic_t cha_lock_current_state = HOMEKIT_CHARACTERISTIC_(LOCK_CURRENT_STATE, 3);
@@ -45,7 +48,7 @@ homekit_characteristic_t cha_lock_target_state = HOMEKIT_CHARACTERISTIC_(LOCK_TA
 homekit_accessory_t *accessories[] = {
   HOMEKIT_ACCESSORY(.id = 1, .category = homekit_accessory_category_garage, .services = (homekit_service_t*[]) {
     HOMEKIT_SERVICE(ACCESSORY_INFORMATION, .characteristics = (homekit_characteristic_t*[]) {
-      HOMEKIT_CHARACTERISTIC(NAME, "GarageDoorOpener-01"),
+      HOMEKIT_CHARACTERISTIC(NAME, homekit_name),
       HOMEKIT_CHARACTERISTIC(MANUFACTURER, "Arduino HomeKit"),
       HOMEKIT_CHARACTERISTIC(SERIAL_NUMBER, "0123456"),
       HOMEKIT_CHARACTERISTIC(MODEL, "ESP8266/ESP32"),
